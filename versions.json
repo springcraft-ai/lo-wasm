@@ -1,0 +1,10 @@
+{
+  "loBranch": "distro/allotropia/zeta-24-2",
+  "loCore": "PENDING-FIRST-BUILD",
+  "emsdkBranch": "fixed-3.1.65",
+  "emsdk": "PENDING-FIRST-BUILD",
+  "qt5Branch": "5.15.2+wasm",
+  "qt5": "PENDING-FIRST-BUILD",
+  "zetajsNpm": "1.2.0",
+  "rationale": "Pin all three component commits to the branch tip captured at the moment of the first successful build. zetajs@1.2.0 (published 2025-05-30) tracks the LibreOffice distro/allotropia/zeta-24-2 branch tip via cdn.zetaoffice.net/zetaoffice_latest/ — there is no published compatibility matrix, so we adopt the same policy and freeze a snapshot. Update procedure: (1) resolve git ls-remote tips for each branch, (2) replace each PENDING-FIRST-BUILD with the resolved sha, (3) run ./build.sh locally to verify, (4) tag and push. Do not rebuild without bumping the pin — same versions.json on a different day = different commits = silently re-rolled ABI dice."
+}

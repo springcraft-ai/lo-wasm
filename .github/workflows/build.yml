@@ -1,0 +1,73 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to use for the dev build (defaults to dev-<sha>)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # needed for gh release create on tag pushes
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve TAG
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="dev-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved TAG=$TAG"
+
+      - name: Build
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
+
+      - name: Show manifest
+        run: cat dist/manifest.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lo-wasm-${{ steps.tag.outputs.tag }}
+          path: |
+            lo-wasm-${{ steps.tag.outputs.tag }}.tar.gz
+            dist/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            "lo-wasm-${TAG}.tar.gz" \
+            "dist/manifest.json" \
+            --title "lo-wasm $TAG" \
+            --notes "Automated build from $(git rev-parse --short HEAD).
+
+          Component pins (see versions.json + manifest.json for sha256s):
+          - LibreOffice  $(node -p 'require(\"./versions.json\").loCore')
+          - Emscripten   $(node -p 'require(\"./versions.json\").emsdk')
+          - Qt 5         $(node -p 'require(\"./versions.json\").qt5')
+          - zetajs npm   $(node -p 'require(\"./versions.json\").zetajsNpm')"

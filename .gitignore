@@ -1,0 +1,12 @@
+# Build outputs — produced by ./build.sh and the GHA workflow, not committed.
+dist/
+lo-wasm-*.tar.gz
+
+# Logs
+*.log
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
