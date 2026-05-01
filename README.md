@@ -1,76 +1,63 @@
 # lo-wasm
 
-Build recipe for the LibreOffice WebAssembly bundle consumed by Springcraft's [Ink](https://get-ink.app) desktop app.
+Build recipe for [LibreOffice](https://www.libreoffice.org/) compiled to WebAssembly with Qt 5, intended for embedding via the [zetajs](https://github.com/allotropia/zetajs) JavaScript bridge.
 
-This repository's outputs let Ink convert `.docx` templates to PDF entirely client-side, with no runtime CDN dependency. It exists so we can ship the WASM bundle inside a signed installer rather than fetching ~80 MB from `cdn.zetaoffice.net` on first launch.
+Each tagged release publishes a single `lo-wasm-${tag}.tar.gz` containing:
 
-It is also the **public source pointer** for the LGPL-3.0 §4 substitution requirement: anyone who receives an Ink installer can replace the bundled WebAssembly with their own build by pointing it at a directory of replacement binaries (see `INK_LO_URL` in the Ink Acknowledgments panel).
+- The WebAssembly bundle: `soffice.{js,wasm,data,data.js,data.js.metadata}`
+- `LICENSES/` — license texts for every component in the bundle
+- `manifest.json` — the SHA-256 of every file in the tarball plus the upstream commit hashes used to produce it
 
-## What this repo produces
+## Build inputs
 
-A single GitHub Release per tag containing:
+| Component | Repository | Branch |
+|---|---|---|
+| LibreOffice core | `git.libreoffice.org/core` | `distro/allotropia/zeta-24-2` |
+| Emscripten | `github.com/allotropia/emscripten` | `fixed-3.1.65` |
+| Qt 5 | `github.com/allotropia/qt5` | `5.15.2+wasm` |
+
+`versions.json` pins a specific SHA for each component at every tag. The build does not float pins.
+
+## Build flags
+
+The LibreOffice configure invocation uses the `LibreOfficeWASM32` distro configuration plus the following slimming flags:
 
 ```
-lo-wasm-${tag}.tar.gz
-├── soffice.js                     Emscripten loader
-├── soffice.wasm                   compiled WebAssembly binary
-├── soffice.data                   preloaded VFS (fonts, configs, registry)
-├── soffice.data.js.metadata       VFS manifest (separate-metadata build)
-├── soffice.data.js                VFS shim
-└── LICENSES/
-    ├── LibreOffice.txt
-    ├── Qt5.txt
-    └── Emscripten.txt
-manifest.json                       sha256 + size of every file in the tarball
+--without-fonts
+--without-help
+--with-locales=en
+--disable-extensions
+--disable-lotuswordpro
 ```
 
-The whole tarball is roughly **80 MB**.
+These assume the embedding environment supplies fonts at runtime and never exposes LibreOffice's user interface. They are not appropriate for builds intended to expose the full UI.
 
-## How to consume from Ink
+## Building
 
-Ink's monorepo pins this repo's release tag in `client/ink/lo-wasm.lock.json`:
+Local (requires Docker on a Linux host or a Linux VM):
 
-```json
-{ "tag": "v...", "sha256": "..." }
+```
+./build.sh
 ```
 
-`client/ink/scripts/fetch-lo-wasm.mjs` reads the lockfile, downloads the tagged release tarball, verifies the sha256, and extracts into `client/ink/resources/lo-wasm/`. From there `electron-builder` packs it into the signed `.app` / `.exe` via the `extraResources` configuration. At runtime the renderer iframe loads `soffice.js` from `file://` — no network involved.
+Tagged release: pushing a `v*` tag invokes `.github/workflows/build.yml` on `ubuntu-latest`, which runs the same `build.sh` and creates a GitHub Release with `lo-wasm-${tag}.tar.gz` and `manifest.json` attached.
 
-## How a build works
+## License
 
-1. `versions.json` pins the source commits for LibreOffice (`distro/allotropia/zeta-24-2` branch on git.libreoffice.org/core), Emscripten (`fixed-3.1.65` branch on allotropia/emscripten), and Qt 5 (`5.15.2+wasm` branch on allotropia/qt5).
-2. The multi-stage `Dockerfile` clones each component at its pinned commit, builds emsdk → Qt 5 (qtbase only) → LibreOffice (Qt-backed WASM build), and stages the contents of `workdir/installation/LibreOffice/emscripten/` plus license texts into `/dist/`.
-3. `build.sh` invokes the Dockerfile, copies `/dist/` out, and runs `gen-manifest.mjs` to produce `manifest.json`.
-4. The GitHub Actions workflow (`.github/workflows/build.yml`) runs the same flow on a tag push, packages the output, and creates a GitHub Release.
+The build recipe in this repository — Dockerfile, scripts, workflow files — is licensed under the Apache License, Version 2.0. See `LICENSE`.
 
-Build host requirements: `ubuntu-latest` GHA runner is sufficient (~1 h end-to-end). Local builds work on any Linux box with Docker; macOS via Docker Desktop also works but is slower.
-
-## Pinning policy
-
-ZetaJS (the JS wrapper Ink uses) tracks the *branch tip* of `distro/allotropia/zeta-24-2`, not specific commits, and the public `cdn.zetaoffice.net/zetaoffice_latest/` is rebuilt off whatever's currently on that branch. There is no published compatibility matrix between zetajs npm versions and LO commits.
-
-Our policy:
-
-- Pin `loCore`, `emsdk`, `qt5` in `versions.json` to the **branch tip captured at the moment of each build**.
-- Capture the rationale (date, what zetajs npm version we're pairing with).
-- Smoke-test against a known-good `.docx` template post-build.
-- **Never rebuild without bumping the pin.** Rebuilding the same `versions.json` on a different day would silently re-roll the dice on ABI compatibility.
-- Bump only when we bump the zetajs npm pin in Ink, or when there's a security/correctness reason to refresh.
-
-## Licenses
-
-This repository (Dockerfile, build scripts, workflow, README) is licensed under **Apache-2.0** — see `LICENSE`. It is Springcraft-authored build tooling, not a derived work of LibreOffice.
-
-The **outputs** carry their upstream component licenses, packed into each release tarball under `LICENSES/`:
+The Apache-2.0 license does not apply to the binary artifacts produced by the recipe. Each component is governed by its upstream license, reproduced in `LICENSES/` of every release tarball:
 
 | Component | License |
 |---|---|
-| LibreOffice | MPL-2.0 + LGPL-3.0+ + GPL-3.0 (in places) |
-| Qt 5 | LGPL-3.0 |
-| Emscripten | MIT + University of Illinois/NCSA |
+| LibreOffice | Mozilla Public License 2.0, with components under LGPL-3.0+ and GPL-3.0 |
+| Qt 5 | GNU Lesser General Public License 3.0 |
+| Emscripten | MIT License and University of Illinois/NCSA Open Source License |
 
-Source pointers for the binaries inherit from upstream. The exact commits are recorded in `manifest.json` for every release. For LibreOffice that's `git.libreoffice.org/core` at the commit listed in `versions.json#loCore`; for Qt 5 that's `github.com/allotropia/qt5` at `versions.json#qt5`; for Emscripten that's `github.com/allotropia/emscripten` at `versions.json#emsdk`.
+A recipient of a release tarball receives the binary under the union of those terms.
+
+This repository at the relevant release tag is the corresponding-source reference for the published binaries: the upstream commits used are recorded in `versions.json`, and rebuilding at that tag fetches them. Downstream redistributors of the binaries can point recipients here to satisfy MPL-2.0 §3 and LGPL-3.0 §4.
 
 ## Trademarks
 
-"LibreOffice" and "The Document Foundation" are trademarks of The Document Foundation. "Qt" is a trademark of The Qt Company Ltd. This repository is not affiliated with or endorsed by either; it builds their software under the terms of the licenses above.
+"LibreOffice" and "The Document Foundation" are trademarks of The Document Foundation. "Qt" is a trademark of The Qt Company Ltd. This repository is not affiliated with, endorsed by, or sponsored by either entity.
