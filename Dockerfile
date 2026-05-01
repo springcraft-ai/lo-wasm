@@ -119,7 +119,14 @@ RUN bash -c 'source /opt/emsdk/emsdk_env.sh && \
     ./autogen.sh \
         --with-distro=LibreOfficeWASM32 \
         QT5DIR=/opt/qt5-wasm \
+        --without-fonts \
         --enable-ccache'
+
+# --without-fonts: skip bundling LO's third-party font collection
+# (~52 MB of TTFs in instdir/share/fonts/truetype/). Ink injects
+# system fonts at runtime via FS.writeFile, so the bundled set is
+# dead weight. Verified via soffice.data.js.metadata breakdown of the
+# initial build.
 
 RUN bash -c 'source /opt/emsdk/emsdk_env.sh && make -j"$(nproc)"'
 

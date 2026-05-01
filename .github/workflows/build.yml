@@ -54,20 +54,32 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          gh release create "$TAG" \
-            "lo-wasm-${TAG}.tar.gz" \
-            "dist/manifest.json" \
-            --title "lo-wasm $TAG" \
-            --notes "Automated build from $(git rev-parse --short HEAD).
+          # Idempotent: if a release was already created out-of-band
+          # (e.g. by a local dev cutting the first release with the
+          # locally-built tarball), upload our artifacts on top with
+          # --clobber. Either way the assets end up attached to the tag.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — uploading assets with --clobber."
+            gh release upload "$TAG" \
+              "lo-wasm-${TAG}.tar.gz" \
+              "dist/manifest.json" \
+              --clobber
+          else
+            gh release create "$TAG" \
+              "lo-wasm-${TAG}.tar.gz" \
+              "dist/manifest.json" \
+              --title "lo-wasm $TAG" \
+              --notes "Automated build from $(git rev-parse --short HEAD).
 
           Component pins (see versions.json + manifest.json for sha256s):
           - LibreOffice  $(node -p 'require(\"./versions.json\").loCore')
           - Emscripten   $(node -p 'require(\"./versions.json\").emsdk')
           - Qt 5         $(node -p 'require(\"./versions.json\").qt5')
           - zetajs npm   $(node -p 'require(\"./versions.json\").zetajsNpm')"
+          fi
