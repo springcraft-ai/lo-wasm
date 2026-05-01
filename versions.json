@@ -1,10 +1,10 @@
 {
   "loBranch": "distro/allotropia/zeta-24-2",
-  "loCore": "PENDING-FIRST-BUILD",
+  "loCore": "dced3bc711d18407a2cc2400eb46e8261b663d95",
   "emsdkBranch": "fixed-3.1.65",
-  "emsdk": "PENDING-FIRST-BUILD",
+  "emsdk": "949ee1d40467b80e90a9fdc67155d443426fef2d",
   "qt5Branch": "5.15.2+wasm",
-  "qt5": "PENDING-FIRST-BUILD",
+  "qt5": "3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa",
   "zetajsNpm": "1.2.0",
-  "rationale": "Pin all three component commits to the branch tip captured at the moment of the first successful build. zetajs@1.2.0 (published 2025-05-30) tracks the LibreOffice distro/allotropia/zeta-24-2 branch tip via cdn.zetaoffice.net/zetaoffice_latest/ — there is no published compatibility matrix, so we adopt the same policy and freeze a snapshot. Update procedure: (1) resolve git ls-remote tips for each branch, (2) replace each PENDING-FIRST-BUILD with the resolved sha, (3) run ./build.sh locally to verify, (4) tag and push. Do not rebuild without bumping the pin — same versions.json on a different day = different commits = silently re-rolled ABI dice."
+  "rationale": "Branch tips resolved 2026-04-30 via `git ls-remote`. zetajs@1.2.0 (published 2025-05-30) tracks the distro/allotropia/zeta-24-2 branch tip via cdn.zetaoffice.net/zetaoffice_latest/ — no published compatibility matrix, so we adopt the same policy and freeze a snapshot. The renderer in client/ink is already proven to work against the live CDN, which is built off this branch's most recent commits, so the tip-at-resolution-time is the most defensible pin. Update procedure: re-run `git ls-remote` for the three branches, replace the shas, capture the new date here, build + smoke-test, tag. Never rebuild without bumping the pin — same versions.json on a different day = different commits = silently re-rolled ABI dice."
 }
