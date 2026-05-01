@@ -64,6 +64,21 @@ jobs:
           # (e.g. by a local dev cutting the first release with the
           # locally-built tarball), upload our artifacts on top with
           # --clobber. Either way the assets end up attached to the tag.
+
+          # Read pins via jq to avoid shell-quoting headaches in the notes body.
+          LO_COMMIT=$(jq -r .loCore versions.json)
+          EMSDK_COMMIT=$(jq -r .emsdk versions.json)
+          QT5_COMMIT=$(jq -r .qt5 versions.json)
+          ZETAJS_NPM=$(jq -r .zetajsNpm versions.json)
+          GIT_SHORT=$(git rev-parse --short HEAD)
+          NOTES="Automated build from ${GIT_SHORT}.
+
+          Component pins (see versions.json + manifest.json for sha256s):
+          - LibreOffice  ${LO_COMMIT}
+          - Emscripten   ${EMSDK_COMMIT}
+          - Qt 5         ${QT5_COMMIT}
+          - zetajs npm   ${ZETAJS_NPM}"
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists — uploading assets with --clobber."
             gh release upload "$TAG" \
@@ -75,11 +90,5 @@ jobs:
               "lo-wasm-${TAG}.tar.gz" \
               "dist/manifest.json" \
               --title "lo-wasm $TAG" \
-              --notes "Automated build from $(git rev-parse --short HEAD).
-
-          Component pins (see versions.json + manifest.json for sha256s):
-          - LibreOffice  $(node -p 'require(\"./versions.json\").loCore')
-          - Emscripten   $(node -p 'require(\"./versions.json\").emsdk')
-          - Qt 5         $(node -p 'require(\"./versions.json\").qt5')
-          - zetajs npm   $(node -p 'require(\"./versions.json\").zetajsNpm')"
+              --notes "$NOTES"
           fi
