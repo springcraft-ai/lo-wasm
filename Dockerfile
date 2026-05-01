@@ -120,13 +120,35 @@ RUN bash -c 'source /opt/emsdk/emsdk_env.sh && \
         --with-distro=LibreOfficeWASM32 \
         QT5DIR=/opt/qt5-wasm \
         --without-fonts \
+        --without-help \
+        --with-locales=en \
+        --disable-extensions \
+        --disable-lotuswordpro \
         --enable-ccache'
 
-# --without-fonts: skip bundling LO's third-party font collection
-# (~52 MB of TTFs in instdir/share/fonts/truetype/). Ink injects
-# system fonts at runtime via FS.writeFile, so the bundled set is
-# dead weight. Verified via soffice.data.js.metadata breakdown of the
-# initial build.
+# Bundle-slimming flags (verified against configure.ac on the
+# distro/allotropia/zeta-24-2 commit pinned in versions.json):
+#
+# --without-fonts        skip ~52 MB of bundled TTFs; client/ink
+#                        injects system fonts at runtime.
+# --without-help         drop the in-app help system; we never expose
+#                        LO's UI so help is unreachable.
+# --with-locales=en      limit locale data (number/date/currency
+#                        formats, collation) to English locales.
+#                        WASM target with --enable-customtarget-
+#                        components only supports "all" or "en".
+#                        Note: docx with non-en locale formatting
+#                        may render with English formatting (mostly
+#                        a Calc concern, rare in Writer→PDF).
+# --disable-extensions   drop extension-loader plumbing.
+# --disable-lotuswordpro drop the Lotus Word Pro import filter; we
+#                        only convert .docx, never .lwp.
+#
+# --enable-mergelibs is incompatible with the above: its hardcoded
+# library list references canvas/help/vba libs that --without-help
+# and --disable-* remove. Tried separately, fails at make-time. Could
+# be revisited by patching solenv/inc/Library_merged.mk to make those
+# entries conditional, but out of scope here.
 
 RUN bash -c 'source /opt/emsdk/emsdk_env.sh && make -j"$(nproc)"'
 
