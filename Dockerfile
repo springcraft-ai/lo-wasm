@@ -17,7 +17,7 @@ ARG EMSDK_COMMIT
 ARG QT5_COMMIT
 
 # ----- base ---------------------------------------------------------------
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -52,8 +52,15 @@ RUN ./emsdk install 3.1.65 && ./emsdk activate 3.1.65 \
     && git clone https://github.com/allotropia/emscripten.git /opt/emsdk/upstream/emscripten \
     && cd /opt/emsdk/upstream/emscripten \
     && git checkout "${EMSDK_COMMIT}" \
+    && bash -c '. /opt/emsdk/emsdk_env.sh && ./bootstrap' \
     && cd /opt/emsdk \
     && ./emsdk activate 3.1.65
+
+# Why bootstrap: replacing /opt/emsdk/upstream/emscripten with the
+# allotropia fork drops the npm packages that `./emsdk install` would
+# normally install in-place. Without bootstrap, em++ refuses to run
+# with "emscripten setup is not complete (npm packages out-of-date)"
+# and Qt5's configure trips on it.
 
 ENV EMSDK=/opt/emsdk
 ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:/opt/emsdk/node/22.16.0_64bit/bin:${PATH}"
@@ -91,6 +98,14 @@ FROM qt-stage AS lo-stage
 ARG LO_COMMIT
 ARG LO_BRANCH=distro/allotropia/zeta-24-2
 
+# LO refuses to build as root ("Building LibreOffice as root is a very
+# bad idea"). Provision a regular user; /opt/emsdk and /opt/qt5-wasm
+# are world-readable from earlier stages, so no further chowns needed.
+RUN useradd -m -s /bin/bash builder \
+    && mkdir -p /build/lo \
+    && chown -R builder:builder /build /build/lo
+
+USER builder
 # Fixed working directory: paths bake into soffice.data, so keeping this
 # stable across rebuilds keeps the artifact deterministic.
 WORKDIR /build/lo
@@ -109,7 +124,7 @@ RUN bash -c 'source /opt/emsdk/emsdk_env.sh && \
 RUN bash -c 'source /opt/emsdk/emsdk_env.sh && make -j"$(nproc)"'
 
 # ----- dist: stage outputs ------------------------------------------------
-FROM ubuntu:22.04 AS dist
+FROM ubuntu:24.04 AS dist
 RUN mkdir -p /dist /dist/LICENSES
 
 # Web root that zetajs expects. Contains soffice.{js,wasm,data,
@@ -123,7 +138,8 @@ RUN rm -f /dist/qt_soffice.html
 
 # License texts. Paths assume the standard layouts of the upstream repos
 # at the pinned commits; if those move, adjust here and rebuild.
-COPY --from=lo-stage /build/lo/LICENSE /dist/LICENSES/LibreOffice.txt
+COPY --from=lo-stage /build/lo/instdir/LICENSE /dist/LICENSES/LibreOffice.txt
+COPY --from=lo-stage /build/lo/instdir/NOTICE /dist/LICENSES/LibreOffice-NOTICE.txt
 COPY --from=qt-stage /build/qt5/src/LICENSE.LGPLv3 /dist/LICENSES/Qt5.txt
 COPY --from=emsdk-stage /opt/emsdk/upstream/emscripten/LICENSE /dist/LICENSES/Emscripten.txt
 
