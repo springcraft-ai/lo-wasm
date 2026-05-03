@@ -121,7 +121,7 @@ RUN bash -c 'source /opt/emsdk/emsdk_env.sh && \
         QT5DIR=/opt/qt5-wasm \
         --without-fonts \
         --without-help \
-        --with-locales=ALL \
+        --with-locales=en \
         --disable-extensions \
         --disable-lotuswordpro \
         --enable-ccache'
@@ -133,14 +133,13 @@ RUN bash -c 'source /opt/emsdk/emsdk_env.sh && \
 #                        injects system fonts at runtime.
 # --without-help         drop the in-app help system; we never expose
 #                        LO's UI so help is unreachable.
-# --with-locales=ALL     bundle locale data (number/date/currency
-#                        formats, collation) for every locale LO
-#                        supports. WASM target with --enable-
-#                        customtarget-components only accepts "all"
-#                        or "en"; "ALL" gives full coverage so docx
-#                        with non-English locale formatting renders
-#                        correctly (e.g. comma decimal separators,
-#                        non-Latin date formats).
+# --with-locales=en      limit locale data (number/date/currency
+#                        formats, collation) to English locales.
+#                        WASM target with --enable-customtarget-
+#                        components only supports "all" or "en".
+#                        Note: docx with non-en locale formatting
+#                        may render with English formatting (mostly
+#                        a Calc concern, rare in Writer→PDF).
 # --disable-extensions   drop extension-loader plumbing.
 # --disable-lotuswordpro drop the Lotus Word Pro import filter; we
 #                        only convert .docx, never .lwp.
